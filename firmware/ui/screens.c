@@ -13,6 +13,7 @@
  */
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 
 #include "nav.h"
 #include "ui.h"
@@ -660,8 +661,40 @@ static struct {
     uint32_t seq, pos, dur, until, clus;
     char title[96], artist[64], album[64], next[64], init[4], codec[8], fmt[12], facts[40];
     uint8_t hue, hires, paused, band, win, err;   /* band: 0 progress, 1 volume, 2 seek */
+    uint8_t cover;                                /* s_cover holds this track's album cover */
     int16_t head;
 } N;
+
+/* The album cover (tools/make_covers.py): COVER_NAME in the track's folder, COVER_W x COVER_W
+ * RGB565 little-endian, rows top down, exactly sizeof s_cover bytes, no header. Drawn at 2x in the
+ * art tile; a track without one keeps the monogram tile. */
+#define COVER_NAME "cover56.rgb"
+#define COVER_W 56
+static uint16_t s_cover[COVER_W * COVER_W];
+
+static int cover_find(void *u, const char *name, const fs_ref_t *r)
+{
+    if ((r->flags & FS_REF_DIR) || r->size != sizeof s_cover || strcasecmp(name, COVER_NAME))
+        return 0;
+    *(fs_ref_t *)u = *r;
+    return 1;
+}
+
+/* 1 when the cover in track t's folder is in s_cover */
+static int cover_load(const fs_ref_t *t)
+{
+    fs_ref_t d = { .clus = t->pclus, .size = t->psize, .vol = t->vol,
+                   .flags = (uint8_t)(FS_REF_DIR | ((t->flags & FS_REF_PCONTIG) ? FS_REF_CONTIG : 0)) }, c;
+    fs_file_t *f;
+    long n;
+
+    c.size = 0;
+    if (fs_scan_ref(&d, cover_find, &c) < 0 || !c.size || !(f = fs_open_ref(&c)))
+        return 0;
+    n = fs_read(f, s_cover, sizeof s_cover);
+    fs_close(f);
+    return n == (long)sizeof s_cover;
+}
 
 /* The seek (VOL+ 2x+hold forward, VOL- 2x+hold back; DESIGN 2.2 N's Seek band): the target moves
  * 2 s every 100 ms held, 10 s after 2 s; the release goes there. Not part of N: a seek outlives
@@ -710,6 +743,7 @@ static void np_load(const audio_status_t *st)
     if (!st->seq)
         return;
     N.clus = st->track.ref.clus;
+    N.cover = (uint8_t)cover_load(&st->track.ref);
     player_get_track(&ti);
     split_name(ti.title, !ti.artist[0], N.title, sizeof N.title);
     snprintf(N.artist, sizeof N.artist, "%s", ti.artist);
@@ -902,13 +936,27 @@ static void np_poll(void)
     }
 }
 
-static void art(const char *init, int hue, int paused)
+static void cover_band(const display_band_t *b)          /* s_cover at 2x over the tile */
+{
+    for (int y = b->ya; y <= b->yb; y++) {
+        const uint16_t *src = s_cover + (y - ART_Y) / 2 * COVER_W;
+        uint16_t *dst = b->band + (y - b->band_y) * DISPLAY_W;
+
+        for (int x = b->cx0; x <= b->cx1; x++)
+            dst[x] = src[(x - ART_X) / 2];
+    }
+}
+
+static void art(const char *init, int hue, int paused, int cover)
 {
     uint16_t c = k_hues[hue & 7], dark = ui_mix(c, 0, 90);
 
-    for (int k = 0; k < 4; k++)
-        ui_fill(ART_X, ART_Y + k * (ART_S / 4), ART_S, ART_S / 4, ui_mix(c, dark, k * 85));
-    if (init[0]) {
+    if (cover)
+        display_custom(ART_X, ART_Y, ART_X + ART_S - 1, ART_Y + ART_S - 1, cover_band, 0, 1);
+    else
+        for (int k = 0; k < 4; k++)
+            ui_fill(ART_X, ART_Y + k * (ART_S / 4), ART_S, ART_S / 4, ui_mix(c, dark, k * 85));
+    if (init[0] && !cover) {
         int w = text_width(&font_d28, init, -1);
 
         ui_text(&font_d28, ART_X + (ART_S - w) / 2, ART_Y + ART_S / 2 + 10, w, 0, init, 0xFFFF, ART_Y, ART_Y + ART_S - 1);
@@ -981,7 +1029,7 @@ static void np_draw(void)
         ui_text(&font_b13, 0, 92, DISPLAY_W, 1, "Nothing playing", t->text_dim, BODY_Y, BAND_Y);
         return;
     }
-    art(N.init, N.hue, N.paused);
+    art(N.init, N.hue, N.paused, N.cover);
     if (N.seq == 0xFFFFFFFFu) {           /* starting: the row's name only */
         text_col(N.title, "", "");
         return;
@@ -1178,7 +1226,7 @@ static void dac_draw(void)
     char a[48], b[48], f[12];
 
     ui_fill(0, BODY_Y, DISPLAY_W, DISPLAY_H - BODY_Y, t->background);
-    art("DAC", 3, 0);
+    art("DAC", 3, 0, 0);
     dac_lines(a, b, sizeof a);
     text_col("Computer audio", a, b);
     snprintf(f, sizeof f, "%u/%u", (unsigned)g_uac.bits, (unsigned)(g_uac.rate / 1000u));

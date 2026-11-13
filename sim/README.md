@@ -129,6 +129,19 @@ mcopy  -i build/sim/internal.img@@1M ::/RECHORD.CFG .    # the settings file
 
 To start fresh, run `mkimage.sh` again.
 
+## Album covers
+
+Now Playing shows an album's cover from `cover56.rgb` in the track's folder (56 x 56 RGB565, drawn
+at 2x); a folder without one keeps the monogram tile. The player doesn't decode JPEGs: the covers
+are made on the PC from each album's embedded picture (or a cover/folder/front .jpg/.png), with
+ffmpeg, before the folder goes onto the image or the player:
+
+```bash
+python3 tools/make_covers.py "/mnt/c/Users/<you>/Music/Echo Mini"     # --force to remake them
+```
+
+Run it before `mkimage.sh`, or copy the new files into an existing image with `mcopy`.
+
 ## Files
 
 - `sim_main.c`: the window, keyboard, scripts, screenshots; runs the firmware on its own thread
