@@ -579,7 +579,7 @@ extract-section3:
 
 # The desktop simulator: the firmware's UI and player in a window (sim/README.md). Needs SDL2.
 sim:
-	$(MAKE) -C sim BOARD=$(or $(BOARD),8g)
+	$(MAKE) -C sim BOARD=$(BOARD)
 
 clean:
 	@$(RMDIR_R) build

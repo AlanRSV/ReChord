@@ -1,8 +1,8 @@
 # ReChord desktop simulator: the firmware's own UI, library, file system, queue and player layer,
 # built for a PC with SDL2. Only the hardware drivers are replaced (sim/*.c).
 #
-#   make -C sim                       # -> build/sim/rechord_sim  (BOARD=8g by default)
-#   make -C sim BOARD=512m            # -> build/sim/rechord_sim_512m
+#   make -C sim                       # -> build/sim/rechord_sim  (BOARD=512m, as the firmware)
+#   make -C sim BOARD=8g              # -> build/sim/rechord_sim_8g
 #   sim/mkimage.sh ~/Music build/sim/internal.img
 #   build/sim/rechord_sim build/sim/internal.img
 #
@@ -11,7 +11,8 @@
 ROOT    := ..
 FW      := $(ROOT)/firmware
 OUT     := $(ROOT)/build/sim
-BOARD   ?= 8g
+# as firmware/ap.mk
+BOARD   ?= 512m
 BOARD_ID := $(if $(filter 8g,$(BOARD)),1,2)
 # objects per board (BOARD is a -D)
 OBJ     := $(OUT)/obj-$(BOARD)
@@ -66,7 +67,7 @@ SIM_OBJS := $(patsubst %.c,$(OBJ)/sim/%.o,$(SIM_SRCS))
 #                        here so sim_hw.c gives the live ones (the keyboard, the real clock)
 GEN_OBJS := $(OBJ)/gen/ap_ovl.o $(OBJ)/gen/panel_io_sim.o
 
-BIN := $(OUT)/rechord_sim$(if $(filter 8g,$(BOARD)),,_$(BOARD))
+BIN := $(OUT)/rechord_sim$(if $(filter 512m,$(BOARD)),,_$(BOARD))
 
 all: $(BIN)
 

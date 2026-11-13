@@ -87,7 +87,8 @@ rechord_sim [--sd sd.img] [--scale N] [--gain DB] [--script FILE] [--headless] i
 - `--script FILE`: press keys from a file and save screenshots, then quit (below).
 - `--headless`: no window (with `--script`, for automated runs).
 
-`make sim BOARD=512m` builds `build/sim/rechord_sim_512m` for the 512 MB model.
+`make sim` builds for the 512 MB model, as the firmware's build does; `make sim BOARD=8g` builds
+`build/sim/rechord_sim_8g` for the 8 GB one.
 
 ## Scripts
 
