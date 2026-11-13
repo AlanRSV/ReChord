@@ -53,6 +53,12 @@ the PC.
    build/sim/rechord_sim build/sim/internal.img
    ```
 
+An image under `/mnt/c` is slow to read through WSL: keep it on Ubuntu's own disk instead, for
+example `sim/mkimage.sh "/mnt/c/..." ~/rechord/internal.img`. Then `sim\run-sim.cmd` starts the
+simulator from Windows (double-click it, or run it from PowerShell): the 8 GB board
+(`make sim BOARD=8g`) on `~/rechord/internal.img`. `--512` picks the 512 MB build, other options
+pass through, and `set RECHORD_IMG=...` picks another image.
+
 On Linux it's the same without step 1 (`sudo apt install` or your distribution's packages).
 On macOS: `brew install sdl2 ffmpeg mtools dosfstools`, then steps 2 to 4.
 

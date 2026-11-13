@@ -1,0 +1,2 @@
+# Batch files need CRLF for cmd.exe, whatever the clone's platform.
+*.cmd text eol=crlf
