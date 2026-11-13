@@ -192,10 +192,15 @@ UPDATE_IMG := $(if $(filter 8g,$(BOARD)),HIFIEC90.IMG,MINIV900.IMG)
 # firmware/drivers/text_load.c into the fonts window (firmware_ap.ld).
 TEXT_FONTS := firmware/drivers/fonts/rechord_fonts.bin
 TEXT_FONTS_MAX := 99840
+# The stock IMG the 33 MB intermediate is spliced into, and the 5 MB reference whose envelope
+# the update file takes (tools/make_fw1.py --stock / --ref). Paths may contain spaces.
+STOCK_IMG ?= stock/3.7.0/ECHO MINI V3.7.0/HIFIEC37.IMG
+REF_IMG   ?= community/refcfw/HIFIEC90.IMG
 cfw-img: $(CFW_ELF) $(COREB_BINS) $(TEXT_FONTS)
 	@test $$(wc -c < $(TEXT_FONTS)) -le $(TEXT_FONTS_MAX) || \
 	    { echo "$(TEXT_FONTS) is over the fonts window ($(TEXT_FONTS_MAX) B, firmware_ap.ld)"; exit 1; }
-	$(PYTHON) tools/make_fw1.py $(CFW_RES_ELF) -o build/ReChord_AP.IMG $(if $(FONT_IMG),--fonts $(FONT_IMG)) $(COREB_MODULES) \
+	$(PYTHON) tools/make_fw1.py $(CFW_RES_ELF) -o build/ReChord_AP.IMG --stock "$(STOCK_IMG)" --ref "$(REF_IMG)" \
+	    $(if $(FONT_IMG),--fonts "$(FONT_IMG)") $(COREB_MODULES) \
 	    --module fonts=$(TEXT_FONTS) $(CFW_OVL_MODULES)
 	cp build/ReChord_AP5M.IMG build/$(UPDATE_IMG)
 	@echo "  update file for the $(BOARD) board: build/$(UPDATE_IMG)"

@@ -252,13 +252,26 @@ def build_ref_shape_5m(img33: bytes, ref_path: Path, out_path: Path, font_img: P
     The reference image (5,242,884 B) is the only fw1-only image proven to
     boot on hardware. This builder clones its envelope: outer header from its
     template (brand/date/hash patched to ours), our fw1 container at 0x1F8,
-    an empty RKnanoFW marker container at 0x44C1F8, and the CRC trailer in
-    the last 4 bytes. Fields describing OUR fw1 extent are patched to ours.
+    an empty RKnanoFW marker container at fw_end + 0x1F8, and the CRC trailer
+    in the last 4 bytes. Fields describing OUR fw1 extent are patched to ours.
+
+    fw_end (header 0x1F4) comes from the template: 0x44C000 in RefCFW 0.9.2,
+    0x450000 in RECHO 0.10.1 (its parts grew past 0x44C000). Both put the
+    trailer at (fw_end + 0x104000) & ~0xFFFFF = 0x500000, the updater's rule.
     """
     ref = ref_path.read_bytes()
     IMG_SIZE = 0x500004
-    MARKER_BASE = 0x44C000
-    MARKER_HDR = 0x44C1F8
+    ref_fw_end = struct.unpack_from("<I", ref, 0x1F4)[0]
+    if len(ref) != IMG_SIZE:
+        raise SystemExit(f"{ref_path}: {len(ref):,} B, not a 5MB reference ({IMG_SIZE:,} B)")
+    if (ref_fw_end + 0x104000) & ~0xFFFFF != IMG_SIZE - 4:
+        raise SystemExit(f"{ref_path}: fw_end 0x{ref_fw_end:X} does not put the trailer at 0x{IMG_SIZE - 4:X}")
+    if ref[ref_fw_end:ref_fw_end + 0x200] != ref[:0x200]:
+        raise SystemExit(f"{ref_path}: no header copy at its fw_end 0x{ref_fw_end:X}")
+    if ref_fw_end < FONT_SLOT_END:
+        raise SystemExit(f"{ref_path}: fw_end 0x{ref_fw_end:X} is below the fonts' end 0x{FONT_SLOT_END:X}")
+    MARKER_HDR = ref_fw_end + 0x1F8
+    print(f"      template {ref_path.name}: fw_end 0x{ref_fw_end:X}")
 
     out = bytearray(IMG_SIZE)
     out[:0x1F8] = ref[:0x1F8]                 # outer table template (proven shape)
@@ -338,6 +351,9 @@ def main() -> int:
                     help="blob stored in the image's module table (core-B images)")
     ap.add_argument("--fonts", type=Path, default=None,
                     help="stock IMG to copy the bitmap fonts from (into the 5MB image)")
+    ap.add_argument("--ref", type=Path, default=Path("community/refcfw/HIFIEC90.IMG"),
+                    help="5MB reference image whose envelope the flashable image takes "
+                         "(default community/refcfw/HIFIEC90.IMG)")
     ap.add_argument("--placeholder", action="store_true",
                     help="build a tiny placeholder ELF (vector table + reset "
                          "loop at 0x03050000) and run the chain on it")
@@ -611,15 +627,17 @@ def main() -> int:
     print(f"        output       {args.output} ({len(img):,} bytes)")
     print(f"        fw1 slot     {fw1_path} ({len(fw1):,} bytes)")
     print()
-    if all(checks):
-        print("RESULT: PASS - all verification checks OK")
+    if not all(checks):
+        print("RESULT: FAIL - see checks above", file=sys.stderr)
+        return 1
+    print("RESULT: PASS - all verification checks OK")
     # Test #9 companion output: the 5MB ref-shape image
-    ref_img = Path("community/refcfw/HIFIEC90.IMG")
+    ref_img = args.ref
     if ref_img.exists():
         build_ref_shape_5m(bytes(img), ref_img, args.output.with_name("ReChord_AP5M.IMG"), args.fonts,
                            [m.split("=", 1) for m in args.module])
     else:
-        print("RESULT: FAIL - see checks above", file=sys.stderr)
+        print(f"RESULT: FAIL - reference image not found: {ref_img}", file=sys.stderr)
         return 1
     print()
     print("  NOTE: flash ReChord_AP5M.IMG (boots on hardware, verdict #20). A")

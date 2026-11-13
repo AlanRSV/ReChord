@@ -13,8 +13,10 @@ FS_SECTORS = 80 * 2048                 # 80 MiB FAT32, 1-sector clusters
 T = tempfile.mkdtemp()
 EXE = os.path.join(T, 'test_fw_update')
 
-subprocess.check_call(['cc', '-O2', '-Wall', '-Ifirmware', '-o', EXE,
-                       'firmware/services/test_fw_update.c', 'firmware/services/fw_update.c'])
+# BOARD_8G (1): the disk below holds HIFIEC90.IMG, a name only the 8 GB board's updater takes
+subprocess.check_call(['cc', '-O2', '-Wall', '-Ifirmware', '-DBOARD=1', '-o', EXE,
+                       'firmware/services/test_fw_update.c', 'firmware/services/fw_update.c',
+                       'firmware/services/scratch.c'])
 
 
 def make_disk(payload):
@@ -65,11 +67,16 @@ end = (struct.unpack_from('<I', img, 0x1F4)[0] + 0x104000) & ~0xFFFFF
 out, d = run(make_disk(img))
 assert f'find 0 HIFIEC90.IMG size {len(img)} fw_end {end:x} sha {hashlib.sha256(img).hexdigest()}' in out
 assert 'install 0' in out and 'retire 0' in out and 'again 1' in out
+# fw_update_install writes fw_end / 512 + 1 sectors (the image and the sector holding its
+# trailer) in 16-sector blocks: the trailer's sector is the file's last bytes (the rest of its
+# cluster: zeros), the block's sectors past the file are 0xFF, and nothing after the block changes
+BLK = 16
+written = (end // 512 + 1 + BLK - 1) // BLK * BLK
 for slot in (0, FW // 2):
     o = (FW_BASE + slot) * 512
-    assert d[o:o + end] == img[:end], f'slot at {slot:#x} differs'
-assert d[(FW_BASE + end // 512) * 512] == 0x5a                       # slot 1 tail untouched
-assert d[(FW_BASE + FW // 2 + end // 512) * 512] == 0x5a             # slot 2 tail untouched
+    assert d[o:o + end + 4] == img[:end + 4], f'slot at {slot:#x} differs'
+    assert d[o + end + 512:o + written * 512] == b'\xff' * (written * 512 - end - 512), f'slot at {slot:#x} padding'
+    assert d[o + written * 512] == 0x5a, f'slot at {slot:#x}: tail past the last block touched'
 fs = os.path.join(T, 'fs_after.img')
 open(fs, 'wb').write(d[(VOL + PART) * 512:])
 fsck = subprocess.run(['/usr/sbin/fsck.fat', '-n', fs], capture_output=True, text=True)
