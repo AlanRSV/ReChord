@@ -1,0 +1,21 @@
+# A tour of the UI: home, Library, All songs, play the first song, Now Playing, back.
+# build/sim/rechord_sim --headless --script sim/demo.keys build/sim/internal.img
+wait 2500
+shot sim_home.bmp
+press DOWN           # Library
+press PLAY
+wait 600
+shot sim_library.bmp
+press PLAY           # All songs
+wait 800
+shot sim_songs.bmp
+press PLAY           # play the first one: Now Playing opens
+wait 2500
+shot sim_now_playing.bmp
+press BACK
+wait 400
+press BACK
+wait 400
+press BACK
+wait 400
+quit

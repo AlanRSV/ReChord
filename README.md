@@ -131,7 +131,11 @@ make cfw-ap -j8                               # core A: build/cfw/rechord_ap.elf
 make cfw-img FONT_IMG=<stock MINIV390.IMG>    # + core-B codec images and the fonts module
 # -> build/MINIV900.IMG (512 MB board); BOARD=8g -> build/HIFIEC90.IMG
 make host-tests                               # host unit tests
+make sim                                      # desktop simulator: build/sim/rechord_sim
 ```
+
+The **simulator** runs the firmware's own UI, library and player code in a window on a PC (Linux or
+WSL), with your music in a disk image and the sound through the PC: see [sim/README.md](sim/README.md).
 
 On a filesystem with coarse timestamps (exFAT), build from clean: `rm -rf build/cfw build/coreb`.
 

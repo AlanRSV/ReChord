@@ -339,7 +339,7 @@ AP_CODEC_LIBS := \
 
 .PHONY: test-tags all bb ap build-bb build-ap link-bb link-ap build-sdk link-firmware \
         toolchain manifests compile-check pack-img pack-bb-img pack-bb-stub-img \
-        bb-stub release pack-full apbb-experimental test-dsp host-tests extract-section3 clean
+        bb-stub release pack-full apbb-experimental test-dsp host-tests extract-section3 clean sim
 
 # Host unit test for the freestanding DSP core (runs on the build machine, no
 # hardware). Verifies the biquad math before it ever touches the device.
@@ -576,6 +576,10 @@ apbb-experimental: bb ap pack-full
 
 extract-section3:
 	$(PYTHON) tools/pack_img.py --extract -o $(BUILD_DIR)/section3_stock.bin
+
+# The desktop simulator: the firmware's UI and player in a window (sim/README.md). Needs SDL2.
+sim:
+	$(MAKE) -C sim BOARD=$(or $(BOARD),8g)
 
 clean:
 	@$(RMDIR_R) build
